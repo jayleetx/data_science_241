@@ -1,0 +1,125 @@
+---
+title: "hw_3_tidy"
+author: "Jay Lee"
+output:
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+library(Lahman)
+data(Teams)
+set.seed(666)
+```
+
+## Part I
+
+### Exercise 5.1
+
+```{r}
+Cubs <- Teams %>%
+  filter(teamID == "CHN") %>%
+  select(yearID, HR, HRA)
+colnames(Cubs) <- c("year", "hit", "allowed")
+Cubs <- Cubs %>%
+  gather(key = side, value = HR, hit, allowed, factor_key = TRUE)
+ggplot(Cubs, aes(x = year, y = HR, color = side)) +
+  geom_point() # geom_line crossed itself too many times to be readable
+```
+
+### Exercise 5.6
+
+```{r}
+ds56 <- data.frame(id = c(1,2,3,1,2,3),
+                   group = c("T", "T", "T", "C", "C", "C"),
+                   vals = c(4.00, 6.00, 8.00, 5.00, 6.00, 10.00))
+ds56
+Treat <- filter(ds56, group == "T")
+Control <- filter(ds56, group == "C")
+all <- mutate(Treat, diff = Treat$vals - Control$vals)
+all
+```
+
+As verified, the code works for this example. This would not work, however, if the order of `id` was changed. The `mutate` being used is subtracting in order of the index, not in order of the `id` values. Additionally, a missing observation (defined as an entire row missing) would similarly mess up the subtraction. This `all` data set also doesn't show you the control values, which would be good to see how the`diff` column got there. A more robust approach is presented below:
+
+```{r}
+ds56 %>%
+  spread(key = group, value = vals) %>%
+  mutate(diff = T - C)
+```
+
+### Exercise 5.7
+
+```{r}
+ds57 <- data.frame(grp = c("A", "A", "B", "B"),
+                   sex = c("F", "M", "F", "M"),
+                   meanL = c(.22, .47, .33, .55),
+                   sdL = c(.11, .33, .11, .31),
+                   meanR = c(.34, .57, .40, .65),
+                   sdR = c(.08, .33, .07, .27))
+ds57
+ds57 %>%
+  gather(key = type, value = val, meanL, sdL, meanR, sdR) %>%
+  unite("sex.type", sex, type, sep = ".") %>%
+  spread(key = sex.type, value = val)
+```
+
+
+## Part II
+
+### Creating Voter Sample
+
+```{r import_sample, cache = TRUE, warning = FALSE, message = FALSE}
+setwd("C:/Users/Jay/Desktop/Data Science 241/jay_lee/hw_3_tidy/data")
+cd1 <- read_tsv("CD1_VoterHistory_Jan2017.txt")
+cd2 <- read_tsv("CD2_VoterHistory_Jan2017.txt")
+cd3 <- read_tsv("CD3_VoterHistory_Jan2017.txt")
+cd4 <- read_tsv("CD4_VoterHistory_Jan2017.txt")
+cd5 <- read_tsv("CD5_VoterHistory_Jan2017.txt")
+VoterFile <- rbind(cd1, cd2, cd3, cd4, cd5)
+voter_sample <- sample_n(VoterFile, 100000)
+rm(cd1, cd2, cd3, cd4, cd5, VoterFile)
+```
+
+We have the sample of 100,000 registered voters. Now we tidy the data to organize it.
+
+### Tidying Data
+
+```{r tidy, cache = TRUE, warning = FALSE}
+voter_sample <- voter_sample %>%
+  filter(!is.na(VOTER_ID), STATUS == "A")
+dim(voter_sample) # Note the number of cases here
+length(unique(voter_sample$VOTER_ID)) # This should match the above
+
+# So, removing the NAs and inactives gives us only unique voter IDs
+
+voter_sample <- voter_sample %>%
+  select(1,6:10,13:15,25:27,37:65,-40)
+
+VoterHistory <- voter_sample %>% # Manipulate to get pvote
+  select(1,16:40) %>%
+  gather(key = date, value = vote, -VOTER_ID,na.rm = T) %>%
+  group_by(VOTER_ID) %>%
+  summarize(pvote = mean(vote == "YES", na.rm = T))
+
+# Now we have the summarized voter history we want
+
+voter_sample2 <- left_join(voter_sample, VoterHistory, by = "VOTER_ID")
+
+givendate <- as.Date(c("2017-01-01"))
+voter_sample2 <- voter_sample2 %>%
+  select(-STATUS, -STATE, -(16:40)) %>%
+  mutate(BIRTH_DATE = mdy(BIRTH_DATE),
+         EFF_REGN_DATE = mdy(EFF_REGN_DATE),
+         PARTY_CODE = as.factor(PARTY_CODE),
+         CONFIDENTIAL = as.factor(CONFIDENTIAL),
+         COUNTY = as.factor(COUNTY),
+         AGE = floor(interval(start = BIRTH_DATE, end = givendate) / 
+                     duration(num = 1, units = "years")))
+
+str(voter_sample2)
+```
+

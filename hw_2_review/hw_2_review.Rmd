@@ -1,0 +1,116 @@
+---
+title: "hw_2_review"
+author: "Jay Lee"
+date: "February 23, 2017"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(mosaicData)
+library(babynames)
+library(Lahman)
+library(tidyverse)
+```
+
+### Exercise 3.1
+
+Create a scatterplot of each person's height against their father's height.
+  
+```{r}
+q <- ggplot(Galton, aes(x = father, y = height)) +
+  geom_point() +
+  geom_jitter()
+q
+```
+
+Separate your plot into facets by sex.
+  
+```{r}
+q + facet_wrap(~ sex)
+```
+
+Add regression lines to all of your facets.
+  
+```{r}
+q + facet_wrap(~sex) +
+  geom_smooth(method = "lm", se = F)
+```
+
+### Exercise 3.2
+
+Create a scatterplot of the number of crossings per day volume against the high temperature that day.
+
+```{r}
+r <- ggplot(RailTrail, aes(x = hightemp, y = volume)) +
+  geom_point() +
+  geom_jitter()
+r
+```
+
+Separate your plot into facets by weekday.
+
+```{r}
+r + facet_wrap(~weekday)
+```
+
+Add regression lines to the two facets.
+
+```{r}
+r + facet_wrap(~weekday) +
+  geom_smooth(method = "lm", se = F)
+```
+
+### Exercise 4.8
+
+Define two new variables in the Teams data frame from the Lahman package: batting average (BA) and slugging percentage (SLG).
+
+```{r}
+Teams2 <- Teams %>%
+  mutate(BA = H / AB, 
+         SLG = (H + X2B + 2 * X3B + 3 * HR) / AB)
+```
+
+### Exercise 4.9
+
+Plot a time series of SLG since 1954 conditioned by lgID. Is slugging percentage typically higher in the American League (AL) or the National League (NL)? Can you think of why this might be the case?
+
+```{r}
+Teams3 <- Teams2 %>%
+  filter(yearID >= 1954)
+ggplot(Teams3, aes(x = yearID, y = SLG)) +
+  geom_point(aes(color = lgID)) +
+  geom_smooth(method = "lm", aes(color = lgID), se = F)
+```
+
+Slugging percentage is typically higher in the AL than in the NL. This makes sense, as the AL utilizes a "designated hitter" position that the NL does not. This player specializes in hitting and doesn't play a defensive position, meaning they generally have higher skill in batting, and thus slugging. This rule was implemented starting in 1973, around when the graph shows the two leagues start to diverge.
+
+### Exercise 4.10
+
+Display the top 15 teams ranked in terms of slugging percentage in MLB history. Repeat this using teams since 1969.
+
+```{r}
+Teams2 %>%
+  arrange(desc(SLG)) %>%
+  slice(1:15) %>%
+  select(yearID, franchID, SLG)
+Teams2 %>%
+  filter(yearID >= 1969) %>%
+  arrange(desc(SLG)) %>%
+  slice(1:15) %>%
+  select(yearID, franchID, SLG)
+```
+
+### Exercise 4.11
+
+The Angels have at times been called the California Angels (CAL), the Anaheim Angels (ANA), and the Los Angeles Angels of Anaheim (LAA). Find the 10 most successful seasons in Angels history. Have they ever won the World Series?
+
+```{r}
+Teams2 %>%
+  filter(franchID %in% c("CAL", "ANA", "LAA")) %>%
+  select(yearID, teamID, G, W, L, WSWin) %>%
+  arrange(desc(W / G)) %>%
+  slice(1:10)
+```
+
+The Angels have won one World Series.
